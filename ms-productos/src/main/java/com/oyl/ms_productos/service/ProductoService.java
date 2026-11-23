@@ -45,8 +45,9 @@ public class ProductoService {
     }
 
     // ---------- ACTUALIZAR ----------
+    @Transactional
     public Producto actualizar(Long id, Producto datos) {
-        Producto actual = buscarPorId(id);   // Si no existe, lanza 404
+        Producto actual = buscarPorIdConBloqueo(id);
 
         // Si cambió el código, revisar que el nuevo no esté usado por otro
         if (!actual.getCodigo().equals(datos.getCodigo())
@@ -61,7 +62,7 @@ public class ProductoService {
         actual.setDescripcion(datos.getDescripcion());
         actual.setPresentacion(datos.getPresentacion());
         actual.setPrecio(datos.getPrecio());
-        actual.setStock(datos.getStock());
+        // PUT conserva el stock leído bajo bloqueo; solo PATCH /stock cambia existencias.
         actual.setStockMinimo(datos.getStockMinimo());
         actual.setDisponible(datos.getDisponible());
         actual.setImagenUrl(datos.getImagenUrl());
@@ -82,9 +83,7 @@ public class ProductoService {
     // cambio positivo = entrada (reponer); negativo = salida (venta)
     @Transactional
     public Producto ajustarStock(Long id, int cambio) {
-        Producto producto = repo.buscarPorIdParaAjustarStock(id).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "El producto " + id + " no existe"));
+        Producto producto = buscarPorIdConBloqueo(id);
         // Calcular en long evita que una suma válida como int cambie de signo.
         long nuevoStock = (long) producto.getStock() + cambio;
 
@@ -100,4 +99,12 @@ public class ProductoService {
         producto.setStock((int) nuevoStock);
         return repo.save(producto);
     }
+
+    // Ambos escritores usan el mismo bloqueo hasta que finaliza su transacción.
+    private Producto buscarPorIdConBloqueo(Long id) {
+        return repo.buscarPorIdConBloqueo(id).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "El producto " + id + " no existe"));
+    }
+
 }

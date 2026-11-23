@@ -13,10 +13,10 @@ import java.util.Optional;
 // JpaRepository<Producto, Long> = repositorio de Productos cuyo id es Long
 public interface ProductoRepository extends JpaRepository<Producto, Long> {
 
-    // El bloqueo se mantiene hasta que termina la transacción del ajuste de stock.
+    // El bloqueo coordina la edición de la ficha con los movimientos de stock.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Producto p WHERE p.id = :id")
-    Optional<Producto> buscarPorIdParaAjustarStock(@Param("id") Long id);
+    Optional<Producto> buscarPorIdConBloqueo(@Param("id") Long id);
 
     // Spring arma el SQL leyendo el nombre del método:
     // SELECT COUNT(*) > 0 FROM productos WHERE codigo = ?
