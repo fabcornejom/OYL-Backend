@@ -82,15 +82,22 @@ public class ProductoService {
     // cambio positivo = entrada (reponer); negativo = salida (venta)
     @Transactional
     public Producto ajustarStock(Long id, int cambio) {
-        Producto producto = buscarPorId(id);
-        int nuevoStock = producto.getStock() + cambio;
+        Producto producto = repo.buscarPorIdParaAjustarStock(id).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "El producto " + id + " no existe"));
+        // Calcular en long evita que una suma válida como int cambie de signo.
+        long nuevoStock = (long) producto.getStock() + cambio;
 
         if (nuevoStock < 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Stock insuficiente de " + producto.getNombre()
                             + ": quedan " + producto.getStock());
         }
-        producto.setStock(nuevoStock);
+        if (nuevoStock > Integer.MAX_VALUE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El stock supera el máximo permitido");
+        }
+        producto.setStock((int) nuevoStock);
         return repo.save(producto);
     }
 }
