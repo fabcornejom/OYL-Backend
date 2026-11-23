@@ -17,6 +17,7 @@ public class DatosIniciales implements CommandLineRunner {
     @Override
     public void run(String... args) {
         service.crearAdminSiNoExiste();
-        System.out.println(">>> Cuenta admin verificada");
+        service.crearClienteSiNoExiste();
+        System.out.println(">>> Cuenta admin y cliente verificada");
     }
 }

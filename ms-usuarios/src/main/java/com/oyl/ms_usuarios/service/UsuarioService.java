@@ -101,4 +101,20 @@ public class UsuarioService {
         admin.setRol(Rol.ADMIN);
         repo.save(admin);
     }
+
+
+    // ---------- CUENTA CLIENTE ----------
+    public void crearClienteSiNoExiste() {
+        if (repo.existsByAliasIgnoreCase("cliente")) return;
+
+        Usuario cliente = new Usuario();
+        cliente.setNombre("Cliente");
+        cliente.setAlias("cliente");
+        cliente.setCorreo("cliente@cliente.cl");
+        cliente.setTelefono("+56 9 4321 4321");
+        cliente.setDireccion("Santiago");
+        cliente.setContrasena(encoder.encode("cliente"));
+        cliente.setRol(Rol.CLIENTE);
+        repo.save(cliente);
+    }
 }
