@@ -19,8 +19,8 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
     Optional<Producto> buscarPorIdConBloqueo(@Param("id") Long id);
 
     // Spring arma el SQL leyendo el nombre del método:
-    // SELECT COUNT(*) > 0 FROM productos WHERE codigo = ?
-    boolean existsByCodigo(String codigo);
+    // Incluye eliminados: sus códigos siguen reservados, también entre variantes de mayúsculas.
+    boolean existsByCodigoIgnoreCase(String codigo);
 
     // SELECT * FROM productos WHERE disponible = true
     List<Producto> findByDisponibleTrueAndEliminadoFalse();

@@ -41,7 +41,7 @@ public class ProductoService {
     public Producto crear(Producto producto) {
         validarPresentacion(producto.getPresentacion());
         fotos.validarReferencia(producto.getImagenUrl(), null);
-        if (repo.existsByCodigo(producto.getCodigo())) {
+        if (repo.existsByCodigoIgnoreCase(producto.getCodigo())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Ya existe un producto con el código " + producto.getCodigo());
         }
@@ -62,8 +62,8 @@ public class ProductoService {
         validarPresentacion(datos.getPresentacion());
 
         // Si cambió el código, revisar que el nuevo no esté usado por otro
-        if (!actual.getCodigo().equals(datos.getCodigo())
-                && repo.existsByCodigo(datos.getCodigo())) {
+        if (!actual.getCodigo().equalsIgnoreCase(datos.getCodigo())
+                && repo.existsByCodigoIgnoreCase(datos.getCodigo())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Ya existe un producto con el código " + datos.getCodigo());
         }
