@@ -9,3 +9,9 @@ CREATE TABLE IF NOT EXISTS compras_stock_detalles (
  precio INTEGER NOT NULL, cantidad INTEGER NOT NULL,
  PRIMARY KEY (operacion, producto_id)
 );
+
+CREATE TABLE IF NOT EXISTS devoluciones_stock (
+ operacion VARCHAR(80) PRIMARY KEY, contenido TEXT NOT NULL,
+ estado VARCHAR(20) NOT NULL, mensaje VARCHAR(300),
+ fecha TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+);

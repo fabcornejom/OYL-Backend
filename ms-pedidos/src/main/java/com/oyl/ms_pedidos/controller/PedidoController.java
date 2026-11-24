@@ -6,6 +6,7 @@ import com.oyl.ms_pedidos.dto.response.PedidoResponse;
 import com.oyl.ms_pedidos.model.EstadoPedido;
 import com.oyl.ms_pedidos.service.PedidoService;
 import com.oyl.ms_pedidos.service.SolicitudCompraService;
+import com.oyl.ms_pedidos.service.CancelacionPedidoService;
 import com.oyl.ms_pedidos.model.Pedido;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,8 +25,9 @@ public class PedidoController {
     private final PedidoService service;
 
     private final SolicitudCompraService compras;
-    public PedidoController(PedidoService service, SolicitudCompraService compras) {
-        this.service = service; this.compras = compras;
+    private final CancelacionPedidoService cancelaciones;
+    public PedidoController(PedidoService service, SolicitudCompraService compras, CancelacionPedidoService cancelaciones) {
+        this.service = service; this.compras = compras; this.cancelaciones = cancelaciones;
     }
 
     // POST devuelve el resultado durable del intento (completado o rechazado).
@@ -47,21 +49,24 @@ public class PedidoController {
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public List<PedidoResponse> listar(@RequestParam(required = false) EstadoPedido estado) {
-        return service.listar(estado).stream().map(PedidoResponse::desde).toList();
+        var pendientes = cancelaciones.idsEnRevision();
+        return service.listar(estado).stream().map(p -> PedidoResponse.desde(p, pendientes.contains(p.getId()))).toList();
     }
 
     // GET /api/pedidos/usuario/2  → historial de un cliente
     @GetMapping("/usuario/{usuarioId}")
     @PreAuthorize("hasRole('ADMIN') or (hasRole('CLIENTE') and #usuarioId.toString() == authentication.name)")
     public List<PedidoResponse> porUsuario(@PathVariable Long usuarioId) {
-        return service.listarPorUsuario(usuarioId).stream().map(PedidoResponse::desde).toList();
+        var pendientes = cancelaciones.idsEnRevision();
+        return service.listarPorUsuario(usuarioId).stream().map(p -> PedidoResponse.desde(p, pendientes.contains(p.getId()))).toList();
     }
 
     // GET /api/pedidos/15  → detalle de un pedido
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','CLIENTE')")
     public PedidoResponse buscar(@PathVariable Long id, @AuthenticationPrincipal Jwt token) {
-        return PedidoResponse.desde(pedidoAutorizado(id, token));
+        Pedido pedido = pedidoAutorizado(id, token);
+        return PedidoResponse.desde(pedido, cancelaciones.idsEnRevision().contains(id));
     }
 
     // PATCH /api/pedidos/15/estado  {"estado": "CONFIRMADO"}  → el admin avanza el estado
@@ -72,13 +77,29 @@ public class PedidoController {
         return PedidoResponse.desde(service.cambiarEstado(id, req.estado()));
     }
 
-    // DELETE /api/pedidos/15  → cancelar (solo pendientes; devuelve el stock)
-    @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PostMapping("/{id}/cancelacion")
     @PreAuthorize("hasAnyRole('ADMIN','CLIENTE')")
-    public void cancelar(@PathVariable Long id, @AuthenticationPrincipal Jwt token) {
-        pedidoAutorizado(id, token);
-        service.cancelar(id);
+    public CancelacionPedidoService.Resultado continuarCancelacion(@PathVariable Long id, @AuthenticationPrincipal Jwt token) {
+        return cancelaciones.continuar(id, Long.valueOf(token.getSubject()), "ADMIN".equals(token.getClaimAsString("role")));
+    }
+
+    @GetMapping("/{id}/cancelacion")
+    @PreAuthorize("hasAnyRole('ADMIN','CLIENTE')")
+    public CancelacionPedidoService.Resultado consultarCancelacion(@PathVariable Long id, @AuthenticationPrincipal Jwt token) {
+        return cancelaciones.consultar(id, Long.valueOf(token.getSubject()), "ADMIN".equals(token.getClaimAsString("role")));
+    }
+
+    // Compatibilidad: DELETE usa la misma operación durable y la misma autorización.
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','CLIENTE')")
+    public org.springframework.http.ResponseEntity<CancelacionPedidoService.Resultado> cancelar(@PathVariable Long id, @AuthenticationPrincipal Jwt token) {
+        var resultado = continuarCancelacion(id, token);
+        HttpStatus estado = switch (resultado.estado()) {
+            case "COMPLETADA" -> HttpStatus.OK;
+            case "RECHAZADA" -> HttpStatus.CONFLICT;
+            default -> HttpStatus.ACCEPTED;
+        };
+        return org.springframework.http.ResponseEntity.status(estado).body(resultado);
     }
 
     private Pedido pedidoAutorizado(Long id, Jwt token) {

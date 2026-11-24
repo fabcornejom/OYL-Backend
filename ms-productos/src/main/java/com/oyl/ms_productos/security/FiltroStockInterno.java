@@ -29,7 +29,7 @@ public class FiltroStockInterno extends OncePerRequestFilter {
         if (enviada != null) {
             String ruta = solicitud.getRequestURI();
             boolean alcance = (solicitud.getMethod().equals("GET") && ruta.matches("/api/productos/[1-9][0-9]*"))
-                || (solicitud.getMethod().equals("POST") && ruta.equals("/api/productos/compras-stock"))
+                || (solicitud.getMethod().equals("POST") && (ruta.equals("/api/productos/compras-stock") || ruta.equals("/api/productos/devoluciones-stock")))
                 || (solicitud.getMethod().equals("PATCH") && ruta.matches("/api/productos/[1-9][0-9]*/stock"));
             if (!MessageDigest.isEqual(clave, enviada.getBytes(StandardCharsets.US_ASCII))) {
                 respuesta.sendError(401); return;

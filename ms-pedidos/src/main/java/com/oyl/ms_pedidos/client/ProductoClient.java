@@ -33,6 +33,16 @@ public class ProductoClient {
         } catch (HttpClientErrorException e) { throw traducirError(e);
         } catch (ResourceAccessException e) { throw noDisponible(); }
     }
+    public record ItemDevolucion(Long productoId, Integer cantidad) {}
+    public record ResultadoDevolucion(String operacion, String estado, String mensaje) {}
+    public ResultadoDevolucion devolver(String operacion, java.util.List<ItemDevolucion> items) {
+        try {
+            return restClient.post().uri("/api/productos/devoluciones-stock")
+                .contentType(MediaType.APPLICATION_JSON).body(Map.of("operacion", operacion, "items", items))
+                .retrieve().body(ResultadoDevolucion.class);
+        } catch (HttpClientErrorException e) { throw traducirError(e);
+        } catch (ResourceAccessException e) { throw noDisponible(); }
+    }
     private final RestClient restClient;
 
     // @Value lee "productos.url" desde application.properties
