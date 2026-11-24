@@ -23,12 +23,16 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
     boolean existsByCodigo(String codigo);
 
     // SELECT * FROM productos WHERE disponible = true
-    List<Producto> findByDisponibleTrue();
+    List<Producto> findByDisponibleTrueAndEliminadoFalse();
+
+    List<Producto> findByEliminadoFalse();
+
+    Optional<Producto> findByIdAndEliminadoFalse(Long id);
 
     // SELECT * FROM productos WHERE LOWER(categoria) = LOWER(?)
-    List<Producto> findByCategoriaIgnoreCase(String categoria);
+    List<Producto> findByCategoriaIgnoreCaseAndEliminadoFalse(String categoria);
 
     // Consulta escrita a mano (JPQL): productos con stock bajo, para el admin
-    @Query("SELECT p FROM Producto p WHERE p.stock <= p.stockMinimo")
+    @Query("SELECT p FROM Producto p WHERE p.eliminado = false AND p.stock <= p.stockMinimo")
     List<Producto> buscarStockBajo();
 }

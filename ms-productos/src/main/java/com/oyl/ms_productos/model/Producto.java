@@ -45,6 +45,11 @@ public class Producto {
     @NotNull
     private Boolean disponible = true;
 
+    // Solo el servicio modifica esta marca; el cliente no puede reactivar un registro eliminado.
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean eliminado = false;
+
     private String imagenUrl;      // Opcional: URL de la foto
 
     // JPA necesita un constructor vacío
@@ -77,6 +82,9 @@ public class Producto {
 
     public Integer getStockMinimo() { return stockMinimo; }
     public void setStockMinimo(Integer stockMinimo) { this.stockMinimo = stockMinimo; }
+
+    public boolean isEliminado() { return eliminado; }
+    public void setEliminado(boolean eliminado) { this.eliminado = eliminado; }
 
     public Boolean getDisponible() { return disponible; }
     public void setDisponible(Boolean disponible) { this.disponible = disponible; }

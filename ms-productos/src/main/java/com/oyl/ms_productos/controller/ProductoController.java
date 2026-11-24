@@ -57,7 +57,7 @@ public class ProductoController {
         return service.actualizar(id, producto);
     }
 
-    // DELETE /api/productos/5
+    // DELETE /api/productos/5: retira del catálogo y conserva el registro para pedidos/devoluciones.
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT) // 204: borrado, sin contenido que devolver
     @PreAuthorize("hasRole('ADMIN')")

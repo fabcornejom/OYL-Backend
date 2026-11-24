@@ -96,7 +96,7 @@ public class FotoProductoService {
         if (productoId == null || productoId <= 0 || version == null || !version.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Fotografía no encontrada");
         }
-        var fotos = jdbc.query("SELECT contenido,version FROM fotos_producto WHERE producto_id=? AND version=?",
+        var fotos = jdbc.query("SELECT f.contenido,f.version FROM fotos_producto f JOIN productos p ON p.id=f.producto_id WHERE f.producto_id=? AND f.version=? AND p.eliminado=false",
             (fila, numero) -> new Guardada(fila.getBytes(1), fila.getString(2)), productoId, version);
         if (fotos.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "La fotografía ya no está disponible. Actualiza el catálogo");
         return fotos.getFirst();

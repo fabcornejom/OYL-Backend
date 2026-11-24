@@ -22,3 +22,6 @@ CREATE TABLE IF NOT EXISTS fotos_producto (
  version VARCHAR(36) NOT NULL, contenido BYTEA NOT NULL,
  CONSTRAINT foto_producto_tamano CHECK (octet_length(contenido) BETWEEN 1 AND 2097152)
 );
+
+-- Los registros existentes siguen visibles. El código y el stock no se eliminan.
+ALTER TABLE productos ADD COLUMN IF NOT EXISTS eliminado BOOLEAN NOT NULL DEFAULT FALSE;

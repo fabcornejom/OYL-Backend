@@ -57,7 +57,7 @@ public class CompraStockService {
             for(Item i:items.values()) {
                 Producto p=productos.buscarPorIdConBloqueo(i.productoId()).orElse(null);
                 String error=null;
-                if(p==null) error="Un producto ya no existe";
+                if(p==null || p.isEliminado()) error="Un producto ya no está disponible en el catálogo";
                 else if(!Boolean.TRUE.equals(p.getDisponible())) error=p.getNombre()+" no está disponible";
                 else if(!i.precioEsperado().equals(p.getPrecio())) error="Cambió el precio de "+p.getNombre();
                 else if(p.getStock()==null || p.getStock()<i.cantidad()) error="Stock insuficiente de "+p.getNombre();

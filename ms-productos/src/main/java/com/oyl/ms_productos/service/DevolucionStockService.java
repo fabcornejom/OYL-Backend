@@ -64,6 +64,7 @@ public class DevolucionStockService {
             var fichas = new ArrayList<Producto>();
             // Mismo orden que las compras y misma fila que los ajustes administrativos.
             for (var item : items.entrySet()) {
+                // La devolución debe encontrar también productos eliminados del catálogo.
                 Producto producto = productos.buscarPorIdConBloqueo(item.getKey()).orElse(null);
                 if (producto == null) {
                     return pendiente(solicitud.operacion(), "No se devolvió stock: falta el producto " + item.getKey() + ". Requiere revisión del administrador.");

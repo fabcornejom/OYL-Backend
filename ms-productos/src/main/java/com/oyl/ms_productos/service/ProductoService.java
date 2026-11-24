@@ -23,11 +23,11 @@ public class ProductoService {
 
     // ---------- LEER ----------
     public List<Producto> listar(boolean soloDisponibles) {
-        return soloDisponibles ? repo.findByDisponibleTrue() : repo.findAll();
+        return soloDisponibles ? repo.findByDisponibleTrueAndEliminadoFalse() : repo.findByEliminadoFalse();
     }
 
     public Producto buscarPorId(Long id) {
-        return repo.findById(id).orElseThrow(() ->
+        return repo.findByIdAndEliminadoFalse(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "El producto " + id + " no existe"));
     }
@@ -44,6 +44,7 @@ public class ProductoService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Ya existe un producto con el código " + producto.getCodigo());
         }
+        producto.setEliminado(false);
         producto.setId(null);   // El id lo genera PostgreSQL, nunca el cliente
         return repo.save(producto);
     }
@@ -102,9 +103,14 @@ public class ProductoService {
     // ---------- ELIMINAR ----------
     @Transactional
     public void eliminar(Long id) {
-        Producto actual = buscarPorIdConBloqueo(id);
-        repo.delete(actual); // La FK elimina también el archivo binario en la misma transacción.
-        repo.flush();
+        // Incluir eliminados para que repetir DELETE sea idempotente.
+        Producto actual = repo.buscarPorIdConBloqueo(id).orElseThrow(() ->
+            new ResponseStatusException(HttpStatus.NOT_FOUND, "El producto " + id + " no existe"));
+        if (actual.isEliminado()) return;
+        actual.setEliminado(true);
+        actual.setDisponible(false);
+        // Conservar id, código, existencias y foto para no romper referencias históricas.
+        repo.saveAndFlush(actual);
     }
 
     // ---------- STOCK ----------
@@ -130,7 +136,7 @@ public class ProductoService {
 
     // Ambos escritores usan el mismo bloqueo hasta que finaliza su transacción.
     private Producto buscarPorIdConBloqueo(Long id) {
-        return repo.buscarPorIdConBloqueo(id).orElseThrow(() ->
+        return repo.buscarPorIdConBloqueo(id).filter(p -> !p.isEliminado()).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "El producto " + id + " no existe"));
     }
