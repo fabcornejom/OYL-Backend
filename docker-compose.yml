@@ -20,9 +20,14 @@ services:
     ports:
       - "8081:8081"
     environment:
+      OYL_SECURITY_PUBLIC_KEY: file:/run/secrets/oyl_jwt_public
+      OYL_SECURITY_STOCK_TOKEN: file:/run/secrets/oyl_stock_service
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/oyl_productos
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
+    secrets:
+      - oyl_jwt_public
+      - oyl_stock_service
     depends_on:
       postgres:
         condition: service_healthy
@@ -32,9 +37,14 @@ services:
     ports:
       - "8083:8083"
     environment:
+      OYL_SECURITY_PUBLIC_KEY: file:/run/secrets/oyl_jwt_public
+      OYL_SECURITY_PRIVATE_KEY: file:/run/secrets/oyl_jwt_private
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/oyl_usuarios
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
+    secrets:
+      - oyl_jwt_public
+      - oyl_jwt_private
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,10 +54,15 @@ services:
     ports:
       - "8082:8082"
     environment:
+      OYL_SECURITY_PUBLIC_KEY: file:/run/secrets/oyl_jwt_public
+      OYL_SECURITY_STOCK_TOKEN: file:/run/secrets/oyl_stock_service
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/oyl_pedidos
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       PRODUCTOS_URL: http://ms-productos:8081   # ← reemplaza productos.url
+    secrets:
+      - oyl_jwt_public
+      - oyl_stock_service
     depends_on:
       postgres:
         condition: service_healthy
@@ -56,3 +71,10 @@ services:
 
 volumes:
   pgdata:
+secrets:
+  oyl_jwt_public:
+    file: ./.oyl-secrets/jwt-public.pem
+  oyl_jwt_private:
+    file: ./.oyl-secrets/jwt-private.pem
+  oyl_stock_service:
+    file: ./.oyl-secrets/stock-service.token

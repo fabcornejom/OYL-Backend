@@ -12,11 +12,14 @@ public record PedidoResponse(
         LocalDateTime fecha,
         EstadoPedido estado,
         Long total,
-        List<DetalleResponse> detalles
+        List<DetalleResponse> detalles,
+        boolean cancelacionEnRevision
 ) {
-    public static PedidoResponse desde(Pedido p) {
+    public static PedidoResponse desde(Pedido p) { return desde(p, false); }
+
+    public static PedidoResponse desde(Pedido p, boolean cancelacionEnRevision) {
         return new PedidoResponse(p.getId(), p.getUsuarioId(), p.getFecha(),
                 p.getEstado(), p.getTotal(),
-                p.getDetalles().stream().map(DetalleResponse::desde).toList());
+                p.getDetalles().stream().map(DetalleResponse::desde).toList(), cancelacionEnRevision);
     }
 }

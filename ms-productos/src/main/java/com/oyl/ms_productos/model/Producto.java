@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 @Entity                       // Esta clase es una tabla de la BD
 @Table(name = "productos")    // Nombre de la tabla
@@ -28,6 +29,7 @@ public class Producto {
     private String descripcion;
 
     @NotBlank(message = "La presentación es obligatoria")
+    @Size(max = 255, message = "La presentación admite hasta 255 caracteres.")
     private String presentacion;   // ej: "Bolsa de 500 g"
 
     @NotNull(message = "El precio es obligatorio")
@@ -44,6 +46,11 @@ public class Producto {
 
     @NotNull
     private Boolean disponible = true;
+
+    // Solo el servicio modifica esta marca; el cliente no puede reactivar un registro eliminado.
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean eliminado = false;
 
     private String imagenUrl;      // Opcional: URL de la foto
 
@@ -77,6 +84,9 @@ public class Producto {
 
     public Integer getStockMinimo() { return stockMinimo; }
     public void setStockMinimo(Integer stockMinimo) { this.stockMinimo = stockMinimo; }
+
+    public boolean isEliminado() { return eliminado; }
+    public void setEliminado(boolean eliminado) { this.eliminado = eliminado; }
 
     public Boolean getDisponible() { return disponible; }
     public void setDisponible(Boolean disponible) { this.disponible = disponible; }

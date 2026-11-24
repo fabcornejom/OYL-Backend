@@ -7,5 +7,6 @@ import jakarta.validation.constraints.NotNull;
 public record ItemPedidoRequest(
         @NotNull(message = "Falta el producto") Long productoId,
         @NotNull(message = "Falta la cantidad")
-        @Min(value = 1, message = "La cantidad debe ser al menos 1") Integer cantidad
+        @Min(value = 1, message = "La cantidad debe ser al menos 1") Integer cantidad,
+        @NotNull @Min(1) Integer precioEsperado
 ) {}

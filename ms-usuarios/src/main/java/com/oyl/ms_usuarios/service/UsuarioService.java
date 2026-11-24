@@ -22,6 +22,8 @@ public class UsuarioService {
 
     // ---------- REGISTRO (solo clientes) ----------
     public Usuario registrar(Usuario usuario) {
+        validarNombre(usuario.getNombre());
+        validarContrasena(usuario.getContrasena(), true);
         if (repo.existsByAliasIgnoreCase(usuario.getAlias())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "El alias " + usuario.getAlias() + " ya está en uso");
@@ -38,6 +40,7 @@ public class UsuarioService {
 
     // ---------- LOGIN ----------
     public Usuario login(String alias, String contrasena) {
+        validarContrasena(contrasena, false);
         Usuario usuario = repo.findByAliasIgnoreCase(alias).orElse(null);
 
         // Mismo mensaje si falla el alias o la contraseña (no damos pistas)
@@ -46,6 +49,27 @@ public class UsuarioService {
                     "Alias o contraseña incorrectos");
         }
         return usuario;
+    }
+
+    // Validar el texto original antes de BCrypt, sin normalizar ni truncar.
+    // El mínimo solo rige para registros nuevos: conservar acceso a cuentas anteriores.
+    private void validarContrasena(String contrasena, boolean registro) {
+        if (contrasena == null || contrasena.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La contraseña es obligatoria");
+        }
+        if (registro && contrasena.length() < 8) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La contraseña debe tener al menos 8 caracteres y no puede estar en blanco.");
+        }
+        if (contrasena.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "La contraseña supera el máximo de 72 bytes UTF-8. Las tildes y los emojis pueden ocupar varios bytes.");
+        }
+    }
+
+    private void validarNombre(String nombre) {
+        if (nombre != null && nombre.length() > 255) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nombre admite hasta 255 caracteres.");
+        }
     }
 
     // ---------- LEER ----------
@@ -63,6 +87,7 @@ public class UsuarioService {
     // No cambia alias, contraseña ni rol: solo datos de contacto
     public Usuario actualizarPerfil(Long id, String nombre, String correo,
                                     String telefono, String direccion) {
+        validarNombre(nombre);
         Usuario usuario = buscarPorId(id);
 
         if (!usuario.getCorreo().equalsIgnoreCase(correo)

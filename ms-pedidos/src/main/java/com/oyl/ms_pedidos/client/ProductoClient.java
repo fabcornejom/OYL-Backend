@@ -10,6 +10,9 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
+import org.springframework.core.io.Resource;
+import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 
 // Se encarga de TODA la comunicación con ms-productos
 @Component
@@ -19,11 +22,38 @@ public class ProductoClient {
     public record ProductoDto(Long id, String nombre, Integer precio,
                               Integer stock, Boolean disponible) {}
 
+
+    public record ItemCompra(Long productoId, Integer cantidad, Integer precioEsperado) {}
+    public record LineaCompra(Long productoId, String nombre, Integer precio, Integer cantidad) {}
+    public record ResultadoCompra(String estado, String mensaje, Long total, java.util.List<LineaCompra> detalles) {}
+    public ResultadoCompra comprar(String operacion, java.util.List<ItemCompra> items) {
+        try {
+            return restClient.post().uri("/api/productos/compras-stock").contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("operacion",operacion,"items",items)).retrieve().body(ResultadoCompra.class);
+        } catch (HttpClientErrorException e) { throw traducirError(e);
+        } catch (ResourceAccessException e) { throw noDisponible(); }
+    }
+    public record ItemDevolucion(Long productoId, Integer cantidad) {}
+    public record ResultadoDevolucion(String operacion, String estado, String mensaje) {}
+    public ResultadoDevolucion devolver(String operacion, java.util.List<ItemDevolucion> items) {
+        try {
+            return restClient.post().uri("/api/productos/devoluciones-stock")
+                .contentType(MediaType.APPLICATION_JSON).body(Map.of("operacion", operacion, "items", items))
+                .retrieve().body(ResultadoDevolucion.class);
+        } catch (HttpClientErrorException e) { throw traducirError(e);
+        } catch (ResourceAccessException e) { throw noDisponible(); }
+    }
     private final RestClient restClient;
 
     // @Value lee "productos.url" desde application.properties
-    public ProductoClient(@Value("${productos.url}") String productosUrl) {
-        this.restClient = RestClient.create(productosUrl);
+    public ProductoClient(@Value("${productos.url}") String productosUrl,
+        @Value("${oyl.security.stock-token:file:../.oyl-secrets/stock-service.token}") Resource archivo) throws IOException {
+        String clave;
+        try (var entrada = archivo.getInputStream()) { clave = new String(entrada.readAllBytes(), StandardCharsets.US_ASCII).trim(); }
+        if (clave.length() < 43) throw new IllegalStateException("Prepara la credencial interna de inventario antes de iniciar pedidos");
+        var fabrica = new org.springframework.http.client.JdkClientHttpRequestFactory(java.net.http.HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(3)).followRedirects(java.net.http.HttpClient.Redirect.NEVER).build());
+        fabrica.setReadTimeout(java.time.Duration.ofSeconds(12));
+        this.restClient = RestClient.builder().requestFactory(fabrica).baseUrl(productosUrl).defaultHeader("X-Oyl-Service-Token", clave).build();
     }
 
     // GET /api/productos/{id}

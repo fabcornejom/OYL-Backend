@@ -15,6 +15,7 @@ public class Usuario {
     private Long id;
 
     @NotBlank(message = "El nombre es obligatorio")
+    @Size(max = 255, message = "El nombre admite hasta 255 caracteres.")
     private String nombre;
 
     @NotBlank(message = "El alias es obligatorio")
@@ -33,7 +34,7 @@ public class Usuario {
     private String direccion;   // Opcional: para retiro o entrega
 
     @NotBlank(message = "La contraseña es obligatoria")
-    @Size(min = 6, message = "La contraseña debe tener al menos 6 caracteres")
+    @Size(min = 8, message = "La contraseña debe tener al menos 8 caracteres")
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)   // Se recibe, pero NUNCA se devuelve
     @Column(nullable = false)
     private String contrasena;

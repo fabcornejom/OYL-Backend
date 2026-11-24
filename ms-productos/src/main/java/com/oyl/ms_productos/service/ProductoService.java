@@ -13,19 +13,21 @@ import java.util.List;
 public class ProductoService {
 
     private final ProductoRepository repo;
+    private final FotoProductoService fotos;
 
     // Inyección por constructor: Spring pasa el repositorio automáticamente
-    public ProductoService(ProductoRepository repo) {
+    public ProductoService(ProductoRepository repo, FotoProductoService fotos) {
         this.repo = repo;
+        this.fotos = fotos;
     }
 
     // ---------- LEER ----------
     public List<Producto> listar(boolean soloDisponibles) {
-        return soloDisponibles ? repo.findByDisponibleTrue() : repo.findAll();
+        return soloDisponibles ? repo.findByDisponibleTrueAndEliminadoFalse() : repo.findByEliminadoFalse();
     }
 
     public Producto buscarPorId(Long id) {
-        return repo.findById(id).orElseThrow(() ->
+        return repo.findByIdAndEliminadoFalse(id).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "El producto " + id + " no existe"));
     }
@@ -35,22 +37,33 @@ public class ProductoService {
     }
 
     // ---------- CREAR ----------
+    @Transactional
     public Producto crear(Producto producto) {
-        if (repo.existsByCodigo(producto.getCodigo())) {
+        validarPresentacion(producto.getPresentacion());
+        fotos.validarReferencia(producto.getImagenUrl(), null);
+        if (repo.existsByCodigoIgnoreCase(producto.getCodigo())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Ya existe un producto con el código " + producto.getCodigo());
         }
+        producto.setEliminado(false);
         producto.setId(null);   // El id lo genera PostgreSQL, nunca el cliente
         return repo.save(producto);
     }
 
     // ---------- ACTUALIZAR ----------
+    @Transactional
     public Producto actualizar(Long id, Producto datos) {
-        Producto actual = buscarPorId(id);   // Si no existe, lanza 404
+        Producto actual = buscarPorIdConBloqueo(id);
+        fotos.validarReferencia(datos.getImagenUrl(), actual.getImagenUrl());
+        return actualizarFicha(actual, datos, true);
+    }
+
+    private Producto actualizarFicha(Producto actual, Producto datos, boolean cambiarReferencia) {
+        validarPresentacion(datos.getPresentacion());
 
         // Si cambió el código, revisar que el nuevo no esté usado por otro
-        if (!actual.getCodigo().equals(datos.getCodigo())
-                && repo.existsByCodigo(datos.getCodigo())) {
+        if (!actual.getCodigo().equalsIgnoreCase(datos.getCodigo())
+                && repo.existsByCodigoIgnoreCase(datos.getCodigo())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Ya existe un producto con el código " + datos.getCodigo());
         }
@@ -61,36 +74,79 @@ public class ProductoService {
         actual.setDescripcion(datos.getDescripcion());
         actual.setPresentacion(datos.getPresentacion());
         actual.setPrecio(datos.getPrecio());
-        actual.setStock(datos.getStock());
+        // PUT conserva el stock leído bajo bloqueo; solo PATCH /stock cambia existencias.
         actual.setStockMinimo(datos.getStockMinimo());
         actual.setDisponible(datos.getDisponible());
-        actual.setImagenUrl(datos.getImagenUrl());
+        if (cambiarReferencia && !java.util.Objects.equals(actual.getImagenUrl(), datos.getImagenUrl())) {
+            fotos.quitar(actual.getId());
+            actual.setImagenUrl(datos.getImagenUrl());
+        }
 
         return repo.save(actual);   // save con id existente = UPDATE
     }
 
+    @Transactional
+    public Producto crearConFoto(Producto producto, FotoProductoService.Preparada foto) {
+        producto.setImagenUrl(null);
+        Producto nuevo = crear(producto);
+        repo.flush();
+        nuevo.setImagenUrl(fotos.guardar(nuevo.getId(), foto));
+        return repo.saveAndFlush(nuevo);
+    }
+
+    @Transactional
+    public Producto actualizarConFoto(Long id, Producto datos, FotoProductoService.Preparada foto) {
+        Producto actual = buscarPorIdConBloqueo(id);
+        actualizarFicha(actual, datos, false);
+        actual.setImagenUrl(fotos.guardar(id, foto));
+        return repo.saveAndFlush(actual);
+    }
+
     // ---------- ELIMINAR ----------
+    @Transactional
     public void eliminar(Long id) {
-        if (!repo.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "El producto " + id + " no existe");
-        }
-        repo.deleteById(id);
+        // Incluir eliminados para que repetir DELETE sea idempotente.
+        Producto actual = repo.buscarPorIdConBloqueo(id).orElseThrow(() ->
+            new ResponseStatusException(HttpStatus.NOT_FOUND, "El producto " + id + " no existe"));
+        if (actual.isEliminado()) return;
+        actual.setEliminado(true);
+        actual.setDisponible(false);
+        // Conservar id, código, existencias y foto para no romper referencias históricas.
+        repo.saveAndFlush(actual);
     }
 
     // ---------- STOCK ----------
     // cambio positivo = entrada (reponer); negativo = salida (venta)
     @Transactional
     public Producto ajustarStock(Long id, int cambio) {
-        Producto producto = buscarPorId(id);
-        int nuevoStock = producto.getStock() + cambio;
+        Producto producto = buscarPorIdConBloqueo(id);
+        // Calcular en long evita que una suma válida como int cambie de signo.
+        long nuevoStock = (long) producto.getStock() + cambio;
 
         if (nuevoStock < 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Stock insuficiente de " + producto.getNombre()
                             + ": quedan " + producto.getStock());
         }
-        producto.setStock(nuevoStock);
+        if (nuevoStock > Integer.MAX_VALUE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El stock supera el máximo permitido");
+        }
+        producto.setStock((int) nuevoStock);
         return repo.save(producto);
     }
+
+    private void validarPresentacion(String presentacion) {
+        if (presentacion != null && presentacion.length() > 255) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La presentación admite hasta 255 caracteres.");
+        }
+    }
+
+    // Ambos escritores usan el mismo bloqueo hasta que finaliza su transacción.
+    private Producto buscarPorIdConBloqueo(Long id) {
+        return repo.buscarPorIdConBloqueo(id).filter(p -> !p.isEliminado()).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "El producto " + id + " no existe"));
+    }
+
 }
