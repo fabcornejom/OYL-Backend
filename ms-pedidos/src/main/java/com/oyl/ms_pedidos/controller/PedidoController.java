@@ -5,6 +5,7 @@ import com.oyl.ms_pedidos.dto.request.CrearPedidoRequest;
 import com.oyl.ms_pedidos.dto.response.PedidoResponse;
 import com.oyl.ms_pedidos.model.EstadoPedido;
 import com.oyl.ms_pedidos.service.PedidoService;
+import com.oyl.ms_pedidos.service.SolicitudCompraService;
 import com.oyl.ms_pedidos.model.Pedido;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,17 +23,23 @@ public class PedidoController {
 
     private final PedidoService service;
 
-    public PedidoController(PedidoService service) {
-        this.service = service;
+    private final SolicitudCompraService compras;
+    public PedidoController(PedidoService service, SolicitudCompraService compras) {
+        this.service = service; this.compras = compras;
     }
 
-    // POST /api/pedidos  → el cliente confirma la compra
+    // POST devuelve el resultado durable del intento (completado o rechazado).
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('CLIENTE')")
-    public PedidoResponse crear(@Valid @RequestBody CrearPedidoRequest req, @AuthenticationPrincipal Jwt token) {
+    public SolicitudCompraService.Resultado crear(@RequestHeader("Idempotency-Key") String clave, @Valid @RequestBody CrearPedidoRequest req, @AuthenticationPrincipal Jwt token) {
         if (!req.usuarioId().toString().equals(token.getSubject())) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        return PedidoResponse.desde(service.crear(req));
+        return compras.crear(clave, req);
+    }
+
+    @GetMapping("/solicitudes/{clave}")
+    @PreAuthorize("hasRole('CLIENTE')")
+    public SolicitudCompraService.Resultado consultarSolicitud(@PathVariable String clave, @AuthenticationPrincipal Jwt token) {
+        return compras.consultar(Long.valueOf(token.getSubject()), clave);
     }
 
     // GET /api/pedidos                         → todos (admin)

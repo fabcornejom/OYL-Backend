@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS compras_stock (
+ operacion VARCHAR(100) PRIMARY KEY, contenido TEXT NOT NULL,
+ estado VARCHAR(20) NOT NULL, mensaje VARCHAR(300), total BIGINT,
+ fecha TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+);
+CREATE TABLE IF NOT EXISTS compras_stock_detalles (
+ operacion VARCHAR(100) NOT NULL REFERENCES compras_stock(operacion),
+ producto_id BIGINT NOT NULL, nombre VARCHAR(100) NOT NULL,
+ precio INTEGER NOT NULL, cantidad INTEGER NOT NULL,
+ PRIMARY KEY (operacion, producto_id)
+);
