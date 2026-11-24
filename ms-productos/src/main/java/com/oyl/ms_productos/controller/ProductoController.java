@@ -65,9 +65,9 @@ public class ProductoController {
         service.eliminar(id);
     }
 
-    // PATCH /api/productos/5/stock  + {"cambio": -2}
+    // Compatibilidad interna exclusivamente. Administradores usan /movimientos-stock/{clave}.
     @PatchMapping("/{id}/stock")
-    @PreAuthorize("hasAnyRole('ADMIN','STOCK_SERVICE')")
+    @PreAuthorize("hasRole('STOCK_SERVICE')")
     public Producto ajustarStock(@PathVariable Long id, @Valid @RequestBody AjusteStock ajuste) {
         return service.ajustarStock(id, ajuste.cambio());
     }
