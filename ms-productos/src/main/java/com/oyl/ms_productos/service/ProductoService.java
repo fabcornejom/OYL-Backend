@@ -13,10 +13,12 @@ import java.util.List;
 public class ProductoService {
 
     private final ProductoRepository repo;
+    private final FotoProductoService fotos;
 
     // Inyección por constructor: Spring pasa el repositorio automáticamente
-    public ProductoService(ProductoRepository repo) {
+    public ProductoService(ProductoRepository repo, FotoProductoService fotos) {
         this.repo = repo;
+        this.fotos = fotos;
     }
 
     // ---------- LEER ----------
@@ -35,7 +37,9 @@ public class ProductoService {
     }
 
     // ---------- CREAR ----------
+    @Transactional
     public Producto crear(Producto producto) {
+        fotos.validarReferencia(producto.getImagenUrl(), null);
         if (repo.existsByCodigo(producto.getCodigo())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Ya existe un producto con el código " + producto.getCodigo());
@@ -48,6 +52,11 @@ public class ProductoService {
     @Transactional
     public Producto actualizar(Long id, Producto datos) {
         Producto actual = buscarPorIdConBloqueo(id);
+        fotos.validarReferencia(datos.getImagenUrl(), actual.getImagenUrl());
+        return actualizarFicha(actual, datos, true);
+    }
+
+    private Producto actualizarFicha(Producto actual, Producto datos, boolean cambiarReferencia) {
 
         // Si cambió el código, revisar que el nuevo no esté usado por otro
         if (!actual.getCodigo().equals(datos.getCodigo())
@@ -65,18 +74,37 @@ public class ProductoService {
         // PUT conserva el stock leído bajo bloqueo; solo PATCH /stock cambia existencias.
         actual.setStockMinimo(datos.getStockMinimo());
         actual.setDisponible(datos.getDisponible());
-        actual.setImagenUrl(datos.getImagenUrl());
+        if (cambiarReferencia && !java.util.Objects.equals(actual.getImagenUrl(), datos.getImagenUrl())) {
+            fotos.quitar(actual.getId());
+            actual.setImagenUrl(datos.getImagenUrl());
+        }
 
         return repo.save(actual);   // save con id existente = UPDATE
     }
 
+    @Transactional
+    public Producto crearConFoto(Producto producto, FotoProductoService.Preparada foto) {
+        producto.setImagenUrl(null);
+        Producto nuevo = crear(producto);
+        repo.flush();
+        nuevo.setImagenUrl(fotos.guardar(nuevo.getId(), foto));
+        return repo.saveAndFlush(nuevo);
+    }
+
+    @Transactional
+    public Producto actualizarConFoto(Long id, Producto datos, FotoProductoService.Preparada foto) {
+        Producto actual = buscarPorIdConBloqueo(id);
+        actualizarFicha(actual, datos, false);
+        actual.setImagenUrl(fotos.guardar(id, foto));
+        return repo.saveAndFlush(actual);
+    }
+
     // ---------- ELIMINAR ----------
+    @Transactional
     public void eliminar(Long id) {
-        if (!repo.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "El producto " + id + " no existe");
-        }
-        repo.deleteById(id);
+        Producto actual = buscarPorIdConBloqueo(id);
+        repo.delete(actual); // La FK elimina también el archivo binario en la misma transacción.
+        repo.flush();
     }
 
     // ---------- STOCK ----------

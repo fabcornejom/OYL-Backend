@@ -15,3 +15,10 @@ CREATE TABLE IF NOT EXISTS devoluciones_stock (
  estado VARCHAR(20) NOT NULL, mensaje VARCHAR(300),
  fecha TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
 );
+
+-- Una fotografía vigente por producto; el archivo no se incluye en el listado JSON.
+CREATE TABLE IF NOT EXISTS fotos_producto (
+ producto_id BIGINT PRIMARY KEY REFERENCES productos(id) ON DELETE CASCADE,
+ version VARCHAR(36) NOT NULL, contenido BYTEA NOT NULL,
+ CONSTRAINT foto_producto_tamano CHECK (octet_length(contenido) BETWEEN 1 AND 2097152)
+);
