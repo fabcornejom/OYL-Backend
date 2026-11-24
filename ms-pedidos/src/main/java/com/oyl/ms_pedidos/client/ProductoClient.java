@@ -10,6 +10,9 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
+import org.springframework.core.io.Resource;
+import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 
 // Se encarga de TODA la comunicación con ms-productos
 @Component
@@ -22,8 +25,12 @@ public class ProductoClient {
     private final RestClient restClient;
 
     // @Value lee "productos.url" desde application.properties
-    public ProductoClient(@Value("${productos.url}") String productosUrl) {
-        this.restClient = RestClient.create(productosUrl);
+    public ProductoClient(@Value("${productos.url}") String productosUrl,
+        @Value("${oyl.security.stock-token:file:../.oyl-secrets/stock-service.token}") Resource archivo) throws IOException {
+        String clave;
+        try (var entrada = archivo.getInputStream()) { clave = new String(entrada.readAllBytes(), StandardCharsets.US_ASCII).trim(); }
+        if (clave.length() < 43) throw new IllegalStateException("Prepara la credencial interna de inventario antes de iniciar pedidos");
+        this.restClient = RestClient.builder().baseUrl(productosUrl).defaultHeader("X-Oyl-Service-Token", clave).build();
     }
 
     // GET /api/productos/{id}
