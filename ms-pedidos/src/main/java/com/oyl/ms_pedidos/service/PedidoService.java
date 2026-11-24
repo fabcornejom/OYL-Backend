@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 
 @Service
@@ -88,7 +89,8 @@ public class PedidoService {
             // 3. ARMAR Y GUARDAR EL PEDIDO
             Pedido pedido = new Pedido();
             pedido.setUsuarioId(req.usuarioId());
-            pedido.setFecha(LocalDateTime.now());
+            // Pedidos nuevos en UTC: Android interpreta así este formato sin offset.
+            pedido.setFecha(LocalDateTime.now(ZoneOffset.UTC));
             pedido.setEstado(EstadoPedido.PENDIENTE_VALIDACION);
 
             for (var entrada : cantidades.entrySet()) {
