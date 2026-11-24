@@ -39,6 +39,7 @@ public class ProductoService {
     // ---------- CREAR ----------
     @Transactional
     public Producto crear(Producto producto) {
+        validarPresentacion(producto.getPresentacion());
         fotos.validarReferencia(producto.getImagenUrl(), null);
         if (repo.existsByCodigo(producto.getCodigo())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -58,6 +59,7 @@ public class ProductoService {
     }
 
     private Producto actualizarFicha(Producto actual, Producto datos, boolean cambiarReferencia) {
+        validarPresentacion(datos.getPresentacion());
 
         // Si cambió el código, revisar que el nuevo no esté usado por otro
         if (!actual.getCodigo().equals(datos.getCodigo())
@@ -132,6 +134,12 @@ public class ProductoService {
         }
         producto.setStock((int) nuevoStock);
         return repo.save(producto);
+    }
+
+    private void validarPresentacion(String presentacion) {
+        if (presentacion != null && presentacion.length() > 255) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La presentación admite hasta 255 caracteres.");
+        }
     }
 
     // Ambos escritores usan el mismo bloqueo hasta que finaliza su transacción.

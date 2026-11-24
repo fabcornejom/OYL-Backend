@@ -15,6 +15,7 @@ public class Usuario {
     private Long id;
 
     @NotBlank(message = "El nombre es obligatorio")
+    @Size(max = 255, message = "El nombre admite hasta 255 caracteres.")
     private String nombre;
 
     @NotBlank(message = "El alias es obligatorio")

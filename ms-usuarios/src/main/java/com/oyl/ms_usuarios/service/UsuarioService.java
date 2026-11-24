@@ -22,6 +22,7 @@ public class UsuarioService {
 
     // ---------- REGISTRO (solo clientes) ----------
     public Usuario registrar(Usuario usuario) {
+        validarNombre(usuario.getNombre());
         validarContrasena(usuario.getContrasena(), true);
         if (repo.existsByAliasIgnoreCase(usuario.getAlias())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -65,6 +66,12 @@ public class UsuarioService {
         }
     }
 
+    private void validarNombre(String nombre) {
+        if (nombre != null && nombre.length() > 255) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nombre admite hasta 255 caracteres.");
+        }
+    }
+
     // ---------- LEER ----------
     public List<Usuario> listar() {
         return repo.findAll();
@@ -80,6 +87,7 @@ public class UsuarioService {
     // No cambia alias, contraseña ni rol: solo datos de contacto
     public Usuario actualizarPerfil(Long id, String nombre, String correo,
                                     String telefono, String direccion) {
+        validarNombre(nombre);
         Usuario usuario = buscarPorId(id);
 
         if (!usuario.getCorreo().equalsIgnoreCase(correo)

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 @Entity                       // Esta clase es una tabla de la BD
 @Table(name = "productos")    // Nombre de la tabla
@@ -28,6 +29,7 @@ public class Producto {
     private String descripcion;
 
     @NotBlank(message = "La presentación es obligatoria")
+    @Size(max = 255, message = "La presentación admite hasta 255 caracteres.")
     private String presentacion;   // ej: "Bolsa de 500 g"
 
     @NotNull(message = "El precio es obligatorio")
