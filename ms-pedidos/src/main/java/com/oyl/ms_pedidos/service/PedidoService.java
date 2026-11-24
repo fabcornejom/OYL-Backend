@@ -32,9 +32,17 @@ public class PedidoService {
     public Pedido crear(CrearPedidoRequest req) {
 
         // 0. Juntar productos repetidos: si viene Almendras 2 y Almendras 1 → Almendras 3
+        if (req == null || req.items() == null || req.items().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El pedido debe tener al menos un producto");
+        }
         Map<Long, Integer> cantidades = new LinkedHashMap<>();
         for (ItemPedidoRequest item : req.items()) {
-            cantidades.merge(item.productoId(), item.cantidad(), Integer::sum);
+            if (item == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El pedido contiene un producto sin cantidad válida");
+            }
+            acumularCantidad(cantidades, item.productoId(), item.cantidad(), HttpStatus.BAD_REQUEST);
         }
 
         // 1. VALIDAR: consultar cada producto en ms-productos (precio y stock reales)
@@ -136,12 +144,35 @@ public class PedidoService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Solo se pueden cancelar pedidos pendientes de validación");
         }
+        if (pedido.getDetalles() == null || pedido.getDetalles().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El pedido no tiene cantidades válidas para devolver");
+        }
         Map<Long, Integer> aDevolver = new LinkedHashMap<>();
         for (DetallePedido d : pedido.getDetalles()) {
-            aDevolver.merge(d.getProductoId(), d.getCantidad(), Integer::sum);
+            if (d == null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "El pedido contiene un producto sin cantidad válida");
+            }
+            acumularCantidad(aDevolver, d.getProductoId(), d.getCantidad(), HttpStatus.CONFLICT);
         }
         devolverStock(aDevolver);
         repo.delete(pedido);
+    }
+
+    // Validar toda la agrupación antes de descontar o devolver existencias.
+    private void acumularCantidad(Map<Long, Integer> cantidades, Long productoId,
+                                  Integer cantidad, HttpStatus estadoError) {
+        if (productoId == null || cantidad == null || cantidad <= 0) {
+            throw new ResponseStatusException(estadoError,
+                    "El pedido contiene un producto o una cantidad inválidos");
+        }
+        long acumulada = (long) cantidades.getOrDefault(productoId, 0) + cantidad;
+        if (acumulada > Integer.MAX_VALUE) {
+            throw new ResponseStatusException(estadoError,
+                    "La cantidad total del producto " + productoId + " supera el máximo permitido");
+        }
+        cantidades.put(productoId, (int) acumulada);
     }
 
     // Suma de vuelta el stock. Si una devolución falla, sigue con las demás
