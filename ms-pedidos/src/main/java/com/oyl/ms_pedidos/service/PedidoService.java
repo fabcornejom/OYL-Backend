@@ -18,6 +18,9 @@ import java.util.*;
 @Service
 public class PedidoService {
 
+    // El modelo de pedido de Android representa el total mediante Int.
+    private static final long MAXIMO_TOTAL_PEDIDO = Integer.MAX_VALUE;
+
     private final PedidoRepository repo;
     private final ProductoClient productoClient;
 
@@ -47,9 +50,14 @@ public class PedidoService {
 
         // 1. VALIDAR: consultar cada producto en ms-productos (precio y stock reales)
         Map<Long, ProductoDto> productos = new LinkedHashMap<>();
+        long totalValidado = 0;
         for (var entrada : cantidades.entrySet()) {
             ProductoDto p = productoClient.obtener(entrada.getKey());   // 404 si no existe
 
+            if (p == null || p.precio() == null || p.precio() <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                        "El catálogo devolvió un precio de producto inválido");
+            }
             if (!Boolean.TRUE.equals(p.disponible())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                         p.nombre() + " no está disponible");
@@ -58,6 +66,14 @@ public class PedidoService {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                         "Stock insuficiente de " + p.nombre() + ": quedan " + p.stock());
             }
+            // Dos int positivos caben multiplicados en long. Comprobar antes de sumar
+            // mantiene el acumulado dentro del límite y evita también su desbordamiento.
+            long subtotal = (long) p.precio() * entrada.getValue();
+            if (subtotal > MAXIMO_TOTAL_PEDIDO - totalValidado) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "El total del pedido supera el máximo permitido de " + MAXIMO_TOTAL_PEDIDO);
+            }
+            totalValidado += subtotal;
             productos.put(p.id(), p);
         }
 
@@ -75,7 +91,6 @@ public class PedidoService {
             pedido.setFecha(LocalDateTime.now());
             pedido.setEstado(EstadoPedido.PENDIENTE_VALIDACION);
 
-            long total = 0;
             for (var entrada : cantidades.entrySet()) {
                 ProductoDto p = productos.get(entrada.getKey());
 
@@ -86,9 +101,8 @@ public class PedidoService {
                 d.setCantidad(entrada.getValue());
 
                 pedido.agregarDetalle(d);
-                total += d.getSubtotal();
             }
-            pedido.setTotal(total);
+            pedido.setTotal(totalValidado);
 
             return repo.save(pedido);   // Guarda el pedido y sus detalles (cascade)
 
